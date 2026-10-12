@@ -1,0 +1,222 @@
+@model ProductManagement.Web.Models.ReportDashboardViewModel
+@{
+    ViewData["Title"] = "Inventory Analytics";
+    var highest = Model.Summary.HighestStockValueCategory;
+    var maxAvgPrice = Model.Summary.CategoryAveragePrices.Any() 
+        ? Model.Summary.CategoryAveragePrices.Max(c => c.AveragePrice) 
+        : 1m;
+}
+
+<div class="container-fluid px-lg-4 mt-4">
+    <!-- Header -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+        <div>
+            <h2 class="fw-bold mb-1 text-dark">
+                <i class="bi bi-pie-chart-fill text-primary me-2"></i>Inventory Analytics &amp; Reports
+            </h2>
+            <p class="text-muted mb-0 small">
+                Real-time breakdown of category pricing benchmarks and inventory asset valuations.
+            </p>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <a asp-controller="Product" asp-action="Index" class="btn btn-outline-secondary shadow-sm">
+                <i class="bi bi-arrow-left me-1"></i> Back to Product List
+            </a>
+            <button type="button" class="btn btn-primary shadow-sm" id="btnRefreshReport">
+                <i class="bi bi-arrow-clockwise me-1"></i> Refresh Data
+            </button>
+        </div>
+    </div>
+
+    <!-- Performance Caching Banner -->
+    <div class="alert alert-light border border-primary border-opacity-25 shadow-sm rounded-4 p-3 mb-4 d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div class="d-flex align-items-center gap-3">
+            <div class="kpi-icon-bubble kpi-icon-blue">
+                <i class="bi bi-speedometer2"></i>
+            </div>
+            <div>
+                <span class="fw-bold text-dark d-block">Data Refresh Strategy</span>
+                <span class="small text-muted" id="cacheStatusText">
+                    Mode: <span class="badge bg-primary px-2 py-1">@Model.Summary.CacheTierUsed</span>
+                    &bull; Last Synchronized: <span class="fw-semibold text-dark">@Model.Summary.GeneratedAt.ToLocalTime().ToString("hh:mm:ss tt")</span>
+                </span>
+            </div>
+        </div>
+        <div class="btn-group" role="group">
+            <a asp-action="Index" asp-route-useLongCache="false" class="btn btn-sm @(!Model.IsCachedLong ? "btn-primary" : "btn-outline-primary")">
+                <i class="bi bi-clock-history me-1"></i> Standard Refresh (5-Min)
+            </a>
+            <a asp-action="Index" asp-route-useLongCache="true" class="btn btn-sm @(Model.IsCachedLong ? "btn-primary" : "btn-outline-primary")">
+                <i class="bi bi-shield-check me-1"></i> Persistent Cache
+            </a>
+        </div>
+    </div>
+
+    <!-- Top Spotlight Row: Highest Stock Value Category -->
+    <div class="row g-4 mb-4">
+        <!-- Highest Stock Value Category Card -->
+        <div class="col-12 col-lg-7">
+            <div class="spotlight-card h-100 d-flex flex-column justify-content-between">
+                <div>
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <span class="badge bg-warning text-dark fw-bold px-3 py-2 text-uppercase" style="letter-spacing: 0.5px;">
+                            <i class="bi bi-trophy-fill me-1"></i> Highest Stock Valuation
+                        </span>
+                        <span class="badge bg-white bg-opacity-20 text-white">Live Benchmark</span>
+                    </div>
+                    <h5 class="text-white-50 text-uppercase small fw-semibold mb-1">Top Valuation Category</h5>
+                    <h2 class="display-6 fw-bold text-white mb-2" id="highestCategoryName">
+                        @(highest != null ? highest.Category : "N/A")
+                    </h2>
+                    <p class="text-white-50 small mb-4">
+                        Represents the product category commanding the largest combined inventory asset value across all current holdings.
+                    </p>
+                </div>
+
+                <div class="row g-3 pt-3 border-top border-white border-opacity-20">
+                    <div class="col-6">
+                        <span class="text-white-50 small d-block">Category Asset Value</span>
+                        <h3 class="fw-bold text-white mb-0" id="highestCategoryValue">
+                            @(highest != null ? highest.TotalStockValue.ToString("C2") : "$0.00")
+                        </h3>
+                    </div>
+                    <div class="col-6">
+                        <span class="text-white-50 small d-block">Units in Stock</span>
+                        <h3 class="fw-bold text-white mb-0" id="highestCategoryQty">
+                            @(highest != null ? highest.TotalStockQuantity.ToString("N0") : "0") <span class="fs-6 fw-normal text-white-50">units</span>
+                        </h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Inventory Totals Card -->
+        <div class="col-12 col-lg-5">
+            <div class="modern-card h-100 p-4 d-flex flex-column justify-content-between">
+                <div>
+                    <h5 class="fw-bold text-dark mb-1">
+                        <i class="bi bi-box-seam text-primary me-2"></i>Catalog Valuation Overview
+                    </h5>
+                    <p class="text-muted small mb-4">Total holdings aggregated across all active product categories.</p>
+                </div>
+
+                <div class="d-flex flex-column gap-3 mb-2">
+                    <div class="p-3 bg-light rounded-3 d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted small d-block">Cumulative Inventory Value</span>
+                            <span class="fs-4 fw-bold text-dark">@Model.Summary.TotalInventoryValue.ToString("C2")</span>
+                        </div>
+                        <div class="kpi-icon-bubble kpi-icon-green">
+                            <i class="bi bi-wallet2"></i>
+                        </div>
+                    </div>
+
+                    <div class="p-3 bg-light rounded-3 d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted small d-block">Total Catalog Items</span>
+                            <span class="fs-4 fw-bold text-dark">@Model.Summary.TotalProductsCount <span class="fs-6 text-muted fw-normal">items</span></span>
+                        </div>
+                        <div class="kpi-icon-bubble kpi-icon-purple">
+                            <i class="bi bi-boxes"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="small text-muted border-top pt-3 d-flex justify-content-between">
+                    <span>Valuation Engine:</span>
+                    <span class="badge bg-success bg-opacity-10 text-success fw-semibold">Active &bull; Real-time</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Category Average Price Analysis Table -->
+    <div class="modern-card">
+        <div class="modern-card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-primary text-white fw-bold px-2 py-1 text-uppercase" style="font-size: 0.72rem;">
+                        Pricing Benchmark
+                    </span>
+                    <h5 class="fw-bold mb-0 text-dark">Average Price of Products by Category</h5>
+                </div>
+                <small class="text-muted">
+                    Statistical mean price calculated across all individual products within each respective category.
+                </small>
+            </div>
+            <span class="badge bg-light text-secondary border px-3 py-2">
+                @Model.Summary.CategoryAveragePrices.Count Categories Analyzed
+            </span>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-modern table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 220px;">Category</th>
+                        <th class="text-center" style="width: 140px;">Product Count</th>
+                        <th class="text-end" style="width: 180px;">Average Price</th>
+                        <th>Relative Category Price Scale</th>
+                    </tr>
+                </thead>
+                <tbody id="avgPriceTableBody">
+                    @if (!Model.Summary.CategoryAveragePrices.Any())
+                    {
+                        <tr>
+                            <td colspan="4" class="text-center py-4 text-muted">
+                                No category data found.
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var row in Model.Summary.CategoryAveragePrices)
+                        {
+                            var percentage = maxAvgPrice > 0 ? (int)((row.AveragePrice / maxAvgPrice) * 100) : 0;
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="kpi-icon-bubble kpi-icon-blue" style="width: 32px; height: 32px; font-size: 0.9rem;">
+                                            <i class="bi bi-tag-fill"></i>
+                                        </div>
+                                        <span class="fw-bold text-dark">@row.Category</span>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-secondary bg-opacity-10 text-secondary border px-2 py-1">
+                                        @row.ProductCount items
+                                    </span>
+                                </td>
+                                <td class="text-end fw-bold text-primary fs-6">
+                                    @row.AveragePrice.ToString("C2")
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div class="progress flex-grow-1" style="height: 10px; border-radius: 6px;">
+                                            <div class="progress-bar bg-primary" role="progressbar" style="width: @percentage%;" aria-valuenow="@percentage" aria-valuemin="0" aria-valuemax="100"></div>
+                                        </div>
+                                        <span class="text-muted small" style="min-width: 45px;">@percentage%</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            $('#btnRefreshReport').on('click', function () {
+                var $btn = $(this);
+                $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Updating...');
+                setTimeout(function () {
+                    window.location.reload();
+                }, 400);
+            });
+        });
+    </script>
+}
